@@ -3,7 +3,7 @@ from itertools import islice
 import numpy as np
 
 from idtpy import model
-from idtpy.shapes import Rectangle, gen_array_rectangle, Group
+from idtpy.shapes import Group, Rectangle, gen_array_rectangle
 from idtpy.utils import sampling
 
 
@@ -24,10 +24,10 @@ class IDT(Group):
     def __init__(self, xn, yn, dxn, wn, cun, cdn, yspan, Ne):
         for arg in [xn, yn, dxn, wn, cun, cdn, yspan]:
             if not callable(arg):
-                raise TypeError(f'{arg.__name__} must be callable')
+                raise TypeError(f"{arg.__name__} must be callable")
         Ne = int(Ne)
         if Ne <= 0:
-            raise ValueError('Ne must be > 0')
+            raise ValueError("Ne must be > 0")
         self.xn = xn
         self.yn = yn
         self.dxn = dxn
@@ -66,7 +66,12 @@ class IDT(Group):
                 y0 -= self.clen(n) / 2
             return y0
 
-        grects = gen_array_rectangle(fdx, fdy, fx0, fy0, )
+        grects = gen_array_rectangle(
+            fdx,
+            fdy,
+            fx0,
+            fy0,
+        )
         rects = list(islice(grects, self.Ne))
         return rects
 
@@ -84,7 +89,7 @@ class IDT(Group):
         elif callable(gap):
             gapn = gap
         else:
-            raise ValueError('argument gapn must be int, float or a function f(n)')
+            raise ValueError("argument gapn must be int, float or a function f(n)")
 
         fdx = self.dxn
         fx0 = self.xn
@@ -176,14 +181,14 @@ class Regular(IDT):
 
         super().__init__(**kwargs)
 
-    def contacts(self, gap, dx_factor=3.):
+    def contacts(self, gap, dx_factor=3.0):
         if self.Nehp == 1:
             rects = self.contacts_single(gap, dx_factor)
         elif self.Nehp > 1:
             rects = self.contacts_n(gap, dx_factor)
         return rects
 
-    def contacts_n(self, gap, dx_factor=1.):
+    def contacts_n(self, gap, dx_factor=1.0):
         rects = []
         m = self.Nehp - 1
         for n, finger in enumerate(self.electrodes):
@@ -194,9 +199,9 @@ class Regular(IDT):
                 dx = np.abs(self.xn(n + m) - self.xn(n)) * dx_factor
             except:
                 continue
-            x0 = (self.xn(n + m) + self.xn(n)) / 2.
+            x0 = (self.xn(n + m) + self.xn(n)) / 2.0
             y0 = self.yn(n)
-            dy0 = self.wn(n) / 2. + dy / 2. + gap
+            dy0 = self.wn(n) / 2.0 + dy / 2.0 + gap
             if self.cun(n) is True and cu is True:
                 rect = Rectangle(dx, dy, (x0, y0 + dy0))
                 rects.append(rect)
@@ -206,14 +211,14 @@ class Regular(IDT):
         rects = Group(rects)
         return rects
 
-    def contacts_single(self, gap, dx_factor=2.):
+    def contacts_single(self, gap, dx_factor=2.0):
         rects = []
         for n, finger in enumerate(self.electrodes):
             dy = self.clen(n) - gap
             dx = self.dxn(n) * dx_factor
             x0 = self.xn(n)
             y0 = self.yn(n)
-            dy0 = self.wn(n) / 2. + dy / 2. + gap
+            dy0 = self.wn(n) / 2.0 + dy / 2.0 + gap
             if self.cun(n) is True:
                 rect = Rectangle(dx, dy, (x0, y0 + dy0))
                 rects.append(rect)
@@ -269,14 +274,14 @@ class LinearChirp(IDT):
         )
         super().__init__(**kwargs)
 
-    def contacts(self, gap, dx_factor=3.):
+    def contacts(self, gap, dx_factor=3.0):
         if self.Nehp == 1:
             rects = self.contacts_single(gap, dx_factor)
         elif self.Nehp > 1:
             rects = self.contacts_n(gap, dx_factor)
         return rects
 
-    def contacts_n(self, gap, dx_factor=1.):
+    def contacts_n(self, gap, dx_factor=1.0):
         rects = []
         m = self.Nehp - 1
         for n, finger in enumerate(self.electrodes):
@@ -287,9 +292,9 @@ class LinearChirp(IDT):
                 dx = np.abs(self.xn(n + m) - self.xn(n)) * dx_factor
             except:
                 continue
-            x0 = (self.xn(n + m) + self.xn(n)) / 2.
+            x0 = (self.xn(n + m) + self.xn(n)) / 2.0
             y0 = self.yn(n)
-            dy0 = self.wn(n) / 2. + dy / 2. + gap
+            dy0 = self.wn(n) / 2.0 + dy / 2.0 + gap
             if self.cun(n) is True and cu is True:
                 rect = Rectangle(dx, dy, (x0, y0 + dy0))
                 rects.append(rect)
@@ -299,14 +304,14 @@ class LinearChirp(IDT):
         rects = Group(rects)
         return rects
 
-    def contacts_single(self, gap, dx_factor=2.):
+    def contacts_single(self, gap, dx_factor=2.0):
         rects = []
         for n, finger in enumerate(self.electrodes):
             dy = self.clen(n) - gap
             dx = self.dxn(n) * dx_factor
             x0 = self.xn(n)
             y0 = self.yn(n)
-            dy0 = self.wn(n) / 2. + dy / 2. + gap
+            dy0 = self.wn(n) / 2.0 + dy / 2.0 + gap
             if self.cun(n) is True:
                 rect = Rectangle(dx, dy, (x0, y0 + dy0))
                 rects.append(rect)
@@ -363,14 +368,14 @@ class ExpChirp(IDT):
         )
         super().__init__(**kwargs)
 
-    def contacts(self, gap, dx_factor=3.):
+    def contacts(self, gap, dx_factor=3.0):
         if self.Nehp == 1:
             rects = self.contacts_single(gap, dx_factor)
         elif self.Nehp > 1:
             rects = self.contacts_n(gap, dx_factor)
         return rects
 
-    def contacts_n(self, gap, dx_factor=1.):
+    def contacts_n(self, gap, dx_factor=1.0):
         rects = []
         m = self.Nehp - 1
         for n, finger in enumerate(self.electrodes):
@@ -381,9 +386,9 @@ class ExpChirp(IDT):
                 dx = np.abs(self.xn(n + m) - self.xn(n)) * dx_factor
             except:
                 continue
-            x0 = (self.xn(n + m) + self.xn(n)) / 2.
+            x0 = (self.xn(n + m) + self.xn(n)) / 2.0
             y0 = self.yn(n)
-            dy0 = self.wn(n) / 2. + dy / 2. + gap
+            dy0 = self.wn(n) / 2.0 + dy / 2.0 + gap
             if self.cun(n) is True and cu is True:
                 rect = Rectangle(dx, dy, (x0, y0 + dy0))
                 rects.append(rect)
@@ -393,14 +398,14 @@ class ExpChirp(IDT):
         rects = Group(rects)
         return rects
 
-    def contacts_single(self, gap, dx_factor=2.):
+    def contacts_single(self, gap, dx_factor=2.0):
         rects = []
         for n, finger in enumerate(self.electrodes):
             dy = self.clen(n) - gap
             dx = self.dxn(n) * dx_factor
             x0 = self.xn(n)
             y0 = self.yn(n)
-            dy0 = self.wn(n) / 2. + dy / 2. + gap
+            dy0 = self.wn(n) / 2.0 + dy / 2.0 + gap
             if self.cun(n) is True:
                 rect = Rectangle(dx, dy, (x0, y0 + dy0))
                 rects.append(rect)
@@ -435,11 +440,11 @@ class Split52(IDT):
         self.l = l
         self.tfact = tfact
 
-        wlen = vsaw / freq;
+        wlen = vsaw / freq
         self.wlen = wlen
-        Nep = 5;
+        Nep = 5
         self.Nep = Nep
-        Ne = int(Np * Nep);
+        Ne = int(Np * Nep)
         self.Ne = Ne
         dxn_corr = thickness_correction(tfact, Ne)
         kwargs = dict(
@@ -455,7 +460,7 @@ class Split52(IDT):
 
         super().__init__(**kwargs)
 
-    def contacts(self, gap, dx_factor=1.):
+    def contacts(self, gap, dx_factor=1.0):
         rects = []
         for n, finger in enumerate(self.electrodes):
             dy = self.clen(n) - gap
@@ -465,13 +470,13 @@ class Split52(IDT):
             except:
                 continue
             y0 = self.yn(n)
-            dy0 = self.wn(n) / 2. + dy / 2. + gap
+            dy0 = self.wn(n) / 2.0 + dy / 2.0 + gap
             if n % self.Nep == 0:
-                x0 = (self.xn(n + 1) + self.xn(n)) / 2.
+                x0 = (self.xn(n + 1) + self.xn(n)) / 2.0
                 rect = Rectangle(dx_small, dy, (x0, y0 + dy0))
                 rects.append(rect)
             elif n % self.Nep == 2:
-                x0 = (self.xn(n + 2) + self.xn(n)) / 2.
+                x0 = (self.xn(n + 2) + self.xn(n)) / 2.0
                 rect = Rectangle(dx_large, dy, (x0, y0 - dy0))
                 rects.append(rect)
         rects = Group(rects)
@@ -495,7 +500,7 @@ class Dart(IDT):
         Ex: [0.8,0.6,20] means that the first 20 fingers will gradually have 80% to 60% finger width. Symmetrically for the last fingers.
     """
 
-    def __init__(self, freq, vsaw, Np, w=30, l=100, tfact=1, direction='r'):
+    def __init__(self, freq, vsaw, Np, w=30, l=100, tfact=1, direction="r"):
         self.freq = freq
         self.vsaw = vsaw
         self.Np = Np
@@ -504,11 +509,11 @@ class Dart(IDT):
         self.tfact = tfact
         self.direction = direction.lower()
 
-        wlen = vsaw / freq;
+        wlen = vsaw / freq
         self.wlen = wlen
-        Nep = 3;
+        Nep = 3
         self.Nep = Nep
-        Ne = int(Np * Nep);
+        Ne = int(Np * Nep)
         self.Ne = Ne
         dxn_corr = thickness_correction(tfact, Ne)
 
@@ -526,13 +531,13 @@ class Dart(IDT):
         super().__init__(**kwargs)
 
     def check_direction(self):
-        if self.direction not in ['l', 'left', 'r', 'right']:
-            raise ValueError(f'direction ({self.direction}) must be left or right')
+        if self.direction not in ["l", "left", "r", "right"]:
+            raise ValueError(f"direction ({self.direction}) must be left or right")
 
     def _xn(self, n):
-        if self.direction in ['r', 'right']:
+        if self.direction in ["r", "right"]:
             rel_pos = [0, 2, 5]
-        elif self.direction in ['l', 'left']:
+        elif self.direction in ["l", "left"]:
             rel_pos = [0, 3, 6]
         rel_pos = np.array(rel_pos) * self.wlen / 8
         dx = sampling(n, rel_pos)
@@ -540,9 +545,9 @@ class Dart(IDT):
         return pos
 
     def _dxn(self, n):
-        if self.direction in ['r', 'right']:
+        if self.direction in ["r", "right"]:
             rel_dx = [1, 1, 3]
-        elif self.direction in ['l', 'left']:
+        elif self.direction in ["l", "left"]:
             rel_dx = [1, 3, 1]
 
         rel_dx = np.array(rel_dx) * self.wlen / 8
@@ -555,7 +560,7 @@ class Dart(IDT):
             dy = self.clen(n) - gap
             dx = self.dxn(n) * dx_factor
             y0 = self.yn(n)
-            dy0 = self.wn(n) / 2. + dy / 2. + gap
+            dy0 = self.wn(n) / 2.0 + dy / 2.0 + gap
             if n % self.Nep == 0:
                 x0 = self.xn(n)
                 rect = Rectangle(dx, dy, (x0, y0 + dy0))
@@ -579,7 +584,7 @@ def thickness_correction(factor, points, method=np.linspace):
     return correction
 
 
-def idt_contact(idt, dx=250, dy=60, loc='tl', gap=40, clen=25, ext=20):
+def idt_contact(idt, dx=250, dy=60, loc="tl", gap=40, clen=25, ext=20):
     """
     Method to create contact rectangles for an IDT
     For more information, see idt_contact.pdf
@@ -598,11 +603,11 @@ def idt_contact(idt, dx=250, dy=60, loc='tl', gap=40, clen=25, ext=20):
     """
     dx = dx + idt.dx + ext
     loc = loc.lower()
-    if 't' in loc:
+    if "t" in loc:
         y0 = idt.ymax - clen + dy / 2
     else:
         y0 = idt.ymin + clen - dy / 2
-    if 'l' in loc:
+    if "l" in loc:
         x0 = idt.xmax + ext - dx / 2
     else:
         x0 = idt.xmin - ext + dx / 2
@@ -615,7 +620,9 @@ def idt_contact(idt, dx=250, dy=60, loc='tl', gap=40, clen=25, ext=20):
     return pos, neg
 
 
-def det_contact(idt, sdx=25, h=100, clen=25, dy=60, left=200, right=200, gap=40, loc='t'):
+def det_contact(
+    idt, sdx=25, h=100, clen=25, dy=60, left=200, right=200, gap=40, loc="t"
+):
     """
     Method to create a T-shape contact aimed for a few fingers IDT
     For more information, see det_contact.pdf
@@ -635,7 +642,7 @@ def det_contact(idt, sdx=25, h=100, clen=25, dy=60, left=200, right=200, gap=40,
         2 Group instances for positive and negative rectangles
     """
     pos, neg = [], []
-    if 't' in loc:
+    if "t" in loc:
         polarity = 1
     else:
         polarity = -1
@@ -690,5 +697,6 @@ def waveguide(dx, dy, gap, center=(0, 0)):
     return pos, neg
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     pass
+
