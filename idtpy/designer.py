@@ -1,6 +1,8 @@
 from itertools import islice
+from typing import Optional
 
 import numpy as np
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from idtpy import model
 from idtpy.shapes import Group, Rectangle, gen_array_rectangle
@@ -19,6 +21,7 @@ class IDT(Group):
         cdn (function): lower contact boolean for each electrode. 'True' creates the contact
         yspan (function): total dy of each electrode
         Ne (int): total number of electrodes
+
     """
 
     def __init__(self, xn, yn, dxn, wn, cun, cdn, yspan, Ne):
@@ -83,6 +86,7 @@ class IDT(Group):
 
         Returns:
             Group instance of the dummy fingers
+
         """
         if isinstance(gap, (int, float)):
             gapn = lambda n: gap
@@ -126,6 +130,7 @@ class IDT(Group):
 
         Returns:
             Group instance of the dummy fingers
+
         """
         dummies = self.dummies(gap)
         self.polygons += dummies.polygons
@@ -138,12 +143,56 @@ class Ground(Group):
         super().__init__([rect])
 
 
+class IDTParams(BaseModel):
+    wlen: Optional[float] = None
+    freq: Optional[float] = None
+    vsaw: Optional[float] = None
+    Np: float = Field(..., gt=0)
+    w: float = Field(30, gt=0)
+    l: float = Field(50, gt=0)
+    Nehp: int = Field(2, gt=0)
+    tfact: float | list = 1
+
+    @field_validator("freq")
+    @classmethod
+    def freq_must_be_positive(cls, v: Optional[float]) -> Optional[float]:
+        if v is not None and v <= 0:
+            raise ValueError("frequency must be positive")
+        return v
+
+    @field_validator("vsaw")
+    @classmethod
+    def vsaw_must_be_positive(cls, v: Optional[float]) -> Optional[float]:
+        if v is not None and v <= 0:
+            raise ValueError("SAW velocity must be positive")
+        return v
+
+    @field_validator("wlen")
+    @classmethod
+    def wlen_must_be_positive(cls, v: Optional[float]) -> Optional[float]:
+        if v is not None and v <= 0:
+            raise ValueError("wavelength must be positive")
+        return v
+
+    @model_validator(mode="after")
+    def validate_wavelength_params(self) -> "IDTParams":
+        has_wlen = self.wlen is not None
+        has_freq_vsaw = self.freq is not None and self.vsaw is not None
+
+        if not has_wlen and not has_freq_vsaw:
+            raise ValueError(
+                "must provide either wavelength or both frequency and SAW velocity",
+            )
+        return self
+
+
 class Regular(IDT):
     """Regular or uniform IDT
 
     Args:
-        freq (float): resonant frequency
-        vsaw (float): SAW speed for calculating the wavelengths
+        wlen (float, optional): wavelength. If provided, freq and vsaw are not needed
+        freq (float, optional): resonant frequency (required if wlen not provided)
+        vsaw (float, optional): SAW speed for calculating the wavelengths (required if wlen not provided)
         Np (float): number of periods. Must be multiples of 0.5
         w (float): constant overlap
         l (float): vertical distance from the end of the overlap to the end of the IDT
@@ -153,18 +202,45 @@ class Regular(IDT):
     Note:
         tfact: If it is list of 3 --> [iniFactor, finalFactor, #fingers on one side].
         Ex: [0.8,0.6,20] means that the first 20 fingers will gradually have 80% to 60% finger width. Symmetrically for the last fingers.
+
     """
 
-    def __init__(self, freq, vsaw, Np, w=30, l=50, Nehp=2, tfact=1):
-        self.freq = freq
-        self.vsaw = vsaw
-        self.Np = Np
-        self.w = w
-        self.l = l
-        self.Nehp = Nehp
-        self.tfact = tfact
+    def __init__(
+        self,
+        wlen=None,
+        freq=None,
+        vsaw=None,
+        Np=1,
+        w=30,
+        l=50,
+        Nehp=2,
+        tfact=1,
+    ):
+        # Validate parameters
+        params = IDTParams(
+            wlen=wlen,
+            freq=freq,
+            vsaw=vsaw,
+            Np=Np,
+            w=w,
+            l=l,
+            Nehp=Nehp,
+            tfact=tfact,
+        )
 
-        wlen = vsaw / freq
+        self.Np = params.Np
+        self.w = params.w
+        self.l = params.l
+        self.Nehp = params.Nehp
+        self.tfact = params.tfact
+
+        # Calculate wavelength
+        if params.wlen is not None:
+            wlen = params.wlen
+        else:
+            wlen = params.vsaw / params.freq
+
+        self.wlen = wlen
         Nep = 2 * Nehp
         Ne = int(Np * Nep)
         dxn_corr = thickness_correction(tfact, Ne)
@@ -245,6 +321,7 @@ class LinearChirp(IDT):
     Note:
         tfact: If it is list of 3 --> [iniFactor, finalFactor, #fingers on one side].
         Ex: [0.8,0.6,20] means that the first 20 fingers will gradually have 80% to 60% finger width. Symmetrically for the last fingers.
+
     """
 
     def __init__(self, fmin, fmax, T, vsaw, w=30, l=100, Nehp=2, tfact=1):
@@ -338,6 +415,7 @@ class ExpChirp(IDT):
     Note:
         tfact: If it is list of 3 --> [iniFactor, finalFactor, #fingers on one side].
         Ex: [0.8,0.6,20] means that the first 20 fingers will gradually have 80% to 60% finger width. Symmetrically for the last fingers.
+
     """
 
     def __init__(self, fmin, fmax, T, vsaw, w=30, l=100, Nehp=2, tfact=1):
@@ -420,8 +498,9 @@ class Split52(IDT):
     """Split52 IDT
 
     Args:
-        freq (float): resonant frequency
-        vsaw (float): SAW speed for calculating the wavelengths
+        wlen (float, optional): wavelength. If provided, freq and vsaw are not needed
+        freq (float, optional): resonant frequency (required if wlen not provided)
+        vsaw (float, optional): SAW speed for calculating the wavelengths (required if wlen not provided)
         Np (float): number of periods. Must be multiples of 0.5
         w (float): constant overlap
         l (float): vertical distance from the end of the overlap to the end of the IDT
@@ -430,22 +509,45 @@ class Split52(IDT):
     Note:
         tfact: If it is list of 3 --> [iniFactor, finalFactor, #fingers on one side].
         Ex: [0.8,0.6,20] means that the first 20 fingers will gradually have 80% to 60% finger width. Symmetrically for the last fingers.
+
     """
 
-    def __init__(self, freq, vsaw, Np, w=30, l=100, tfact=1):
-        self.freq = freq
-        self.vsaw = vsaw
-        self.Np = Np
-        self.w = w
-        self.l = l
-        self.tfact = tfact
+    def __init__(
+        self,
+        wlen=None,
+        freq=None,
+        vsaw=None,
+        Np=1,
+        w=30,
+        l=100,
+        tfact=1,
+    ):
+        # Validate parameters
+        params = IDTParams(
+            wlen=wlen,
+            freq=freq,
+            vsaw=vsaw,
+            Np=Np,
+            w=w,
+            l=l,
+            Nehp=1,  # Not used but required by IDTParams
+            tfact=tfact,
+        )
 
-        wlen = vsaw / freq
+        self.Np = params.Np
+        self.w = params.w
+        self.l = params.l
+        self.tfact = params.tfact
+
+        # Calculate wavelength
+        if params.wlen is not None:
+            wlen = params.wlen
+        else:
+            wlen = params.vsaw / params.freq
+
         self.wlen = wlen
         Nep = 5
-        self.Nep = Nep
         Ne = int(Np * Nep)
-        self.Ne = Ne
         dxn_corr = thickness_correction(tfact, Ne)
         kwargs = dict(
             xn=lambda n: wlen / Nep * n,
@@ -487,34 +589,61 @@ class Dart(IDT):
     """Unidirection IDT of DART type
 
     Args:
-        freq (float): resonant frequency
-        vsaw (float): SAW speed for calculating the wavelengths
+        wlen (float, optional): wavelength. If provided, freq and vsaw are not needed
+        freq (float, optional): resonant frequency (required if wlen not provided)
+        vsaw (float, optional): SAW speed for calculating the wavelengths (required if wlen not provided)
         Np (float): number of periods. Must be multiples of 0.5
         w (float): constant overlap
         l (float): vertical distance from the end of the overlap to the end of the IDT
-        tfact (float, list of 3): factor for finger width (see the example below)
+        tfact (float, list of 3): factor for finger width (see example below)
         direction (str): 'l' (left) or 'r' (right)
 
     Note:
         tfact: If it is list of 3 --> [iniFactor, finalFactor, #fingers on one side].
         Ex: [0.8,0.6,20] means that the first 20 fingers will gradually have 80% to 60% finger width. Symmetrically for the last fingers.
+
     """
 
-    def __init__(self, freq, vsaw, Np, w=30, l=100, tfact=1, direction="r"):
-        self.freq = freq
-        self.vsaw = vsaw
-        self.Np = Np
-        self.w = w
-        self.l = l
-        self.tfact = tfact
+    def __init__(
+        self,
+        wlen=None,
+        freq=None,
+        vsaw=None,
+        Np=1,
+        w=30,
+        l=100,
+        tfact=1,
+        direction="r",
+    ):
         self.direction = direction.lower()
+        self.check_direction()
 
-        wlen = vsaw / freq
+        # Validate parameters
+        params = IDTParams(
+            wlen=wlen,
+            freq=freq,
+            vsaw=vsaw,
+            Np=Np,
+            w=w,
+            l=l,
+            Nehp=1,  # Not used but required by IDTParams
+            tfact=tfact,
+        )
+
+        self.Np = params.Np
+        self.w = params.w
+        self.l = params.l
+        self.tfact = params.tfact
+
+        # Calculate wavelength
+        if params.wlen is not None:
+            wlen = params.wlen
+        else:
+            wlen = params.vsaw / params.freq
+
         self.wlen = wlen
         Nep = 3
-        self.Nep = Nep
         Ne = int(Np * Nep)
-        self.Ne = Ne
         dxn_corr = thickness_correction(tfact, Ne)
 
         kwargs = dict(
@@ -585,8 +714,7 @@ def thickness_correction(factor, points, method=np.linspace):
 
 
 def idt_contact(idt, dx=250, dy=60, loc="tl", gap=40, clen=25, ext=20):
-    """
-    Method to create contact rectangles for an IDT
+    """Method to create contact rectangles for an IDT
     For more information, see idt_contact.pdf
 
     Args:
@@ -600,6 +728,7 @@ def idt_contact(idt, dx=250, dy=60, loc="tl", gap=40, clen=25, ext=20):
 
     Returns:
         2 Group instances for positive and negative rectangles
+
     """
     dx = dx + idt.dx + ext
     loc = loc.lower()
@@ -621,10 +750,17 @@ def idt_contact(idt, dx=250, dy=60, loc="tl", gap=40, clen=25, ext=20):
 
 
 def det_contact(
-    idt, sdx=25, h=100, clen=25, dy=60, left=200, right=200, gap=40, loc="t"
+    idt,
+    sdx=25,
+    h=100,
+    clen=25,
+    dy=60,
+    left=200,
+    right=200,
+    gap=40,
+    loc="t",
 ):
-    """
-    Method to create a T-shape contact aimed for a few fingers IDT
+    """Method to create a T-shape contact aimed for a few fingers IDT
     For more information, see det_contact.pdf
 
     Args:
@@ -640,6 +776,7 @@ def det_contact(
 
     Returns:
         2 Group instances for positive and negative rectangles
+
     """
     pos, neg = [], []
     if "t" in loc:
@@ -667,8 +804,7 @@ def det_contact(
 
 
 def channel(idt1, idt2, clen=25, gap=20):
-    """
-    Method to create a rectangle for the channel between 2 IDTs
+    """Method to create a rectangle for the channel between 2 IDTs
     For more information, see channel.pdf
 
     Args:
@@ -680,6 +816,7 @@ def channel(idt1, idt2, clen=25, gap=20):
     Returns:
         2 Group instances for positive and negative rectangles.
         Note: positive is empty
+
     """
     idts = idt1 + idt2
     ch = Rectangle(idts.dx, idts.dy, idts.center)
@@ -699,4 +836,3 @@ def waveguide(dx, dy, gap, center=(0, 0)):
 
 if __name__ == "__main__":
     pass
-
